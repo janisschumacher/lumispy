@@ -9,7 +9,10 @@ This example shows how to plot color-filtered (chromatic) images from a hyperspe
 # Load the data
 import lumispy as lum
 import hyperspy.api as hs
+<<<<<<< HEAD
 import matplotlib.pyplot as plt
+=======
+>>>>>>> upstream/main
 
 cl1 = lum.data.nanoparticles()
 
@@ -29,7 +32,7 @@ cl1.T.mean().plot(cmap="viridis")
 cl1.isig[480.0:550.0].T.mean().plot(cmap="viridis")
 
 # %%
-# This can also be done interacitvely using :py:func:`hyperspy.api.plot.plot_roi_map`
+# This spectral filtering can also be done interactively using :py:func:`hyperspy.api.plot.plot_roi_map`. Note that instead of passing explicit ``SpanROI`` objects, the parameter ``rois`` can also take an integer number, for which the corresponding number of ROIs will be initialized with default values for interactive adaptataion:
 
 roi1 = hs.roi.SpanROI(left=480.0, right=550.0)
 hs.plot.plot_roi_map(signal=cl1, rois=roi1, cmap="viridis")
