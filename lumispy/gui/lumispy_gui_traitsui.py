@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with LumiSpy. If not, see <https://www.gnu.org/licenses/#GPL>.
 
+
 def time2nav_tool_traitsui(obj, **kwargs):
 
     return obj
