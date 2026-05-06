@@ -19,13 +19,14 @@
 import ipywidgets
 from IPython.display import display as ipy_display
 
+
 def time2nav_tool_ipy(obj, display=True, **kwargs):
     output = ipywidgets.Output()
     wdict = {}
     apply = ipywidgets.Button(
-        description="Apply",
-        tooltip="Apply the selected intervals.")
-    
+        description="Apply", tooltip="Apply the selected intervals."
+    )
+
     wdict["apply_button"] = apply
 
     def on_apply_clicked(b):
@@ -34,23 +35,20 @@ def time2nav_tool_ipy(obj, display=True, **kwargs):
             try:
                 obj.validate_intervals()
             except ValueError as e:
-                print('ValueError: ' + str(e))
-            #if obj.validate_intervals() is False:
-                #raise ValueError("negative values in intervals are not allowed")
+                print("ValueError: " + str(e))
+            # if obj.validate_intervals() is False:
+            # raise ValueError("negative values in intervals are not allowed")
 
         obj.apply_button_clicked()
 
         with output:
             print("Result available via: tool.result")
+
     apply.on_click(on_apply_clicked)
 
-    box = ipywidgets.VBox([
-        ipywidgets.HBox([apply]),
-        output
-    ])
-    
+    box = ipywidgets.VBox([ipywidgets.HBox([apply]), output])
 
-    ipy_display(box) 
+    ipy_display(box)
 
     obj.widget = box
 
