@@ -10,6 +10,8 @@ Reference
     :maxdepth: 2
 
     lumispy
+    components/index
+    data/index
     signals/index
     utils/index
 

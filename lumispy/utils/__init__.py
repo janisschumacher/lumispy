@@ -28,7 +28,6 @@ from .axes import (
 
 from .signals import (
     com,
-    crop_edges,
 )
 
 __all__ = [
@@ -40,7 +39,6 @@ __all__ = [
     "var2invcm",
     "solve_grating_equation",
     "com",
-    "crop_edges",
 ]
 
 
