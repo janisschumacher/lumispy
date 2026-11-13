@@ -22,9 +22,10 @@ from .axes import (
     var2eV,
     axis2invcm,
     data2invcm,
+    var2invcm,
     axis2nm,
     data2nm,
-    var2invcm,
+    var2nm,
     solve_grating_equation,
 )
 
@@ -38,9 +39,10 @@ __all__ = [
     "var2eV",
     "axis2invcm",
     "data2invcm",
+    "var2invcm",
     "axis2nm",
     "data2nm",
-    "var2invcm",
+    "var2nm",
     "solve_grating_equation",
     "com",
 ]

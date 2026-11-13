@@ -95,19 +95,22 @@ def axis2nm(ax0):
     """Convert given signal axis to wavelength scale (nm). Automatically checks axis units.
     """
     if ax0.units == "nm":
-        raise AttributeError("Signal unit is already nm.")
+        raise ValueError("Axis unit is already nm.")
     elif ax0.units == "µm":
         nmaxis = (1000*ax0.axis).astype("float")
         factor = 1
     # transform axis, invert direction   
     elif ax0.units == r"cm$^{-1}$":
         nmaxis = invcm2nm(ax0.axis)[::-1].astype("float")
-        factor = 1e3  # correction factor for intensity
+        factor = 1e7  # correction factor for intensity
     elif ax0.units == "eV":
         nmaxis = eV2nm(ax0.axis)[::-1].astype("float")
         factor = 1e6
+    elif ax0.units == "meV":
+        nmaxis = eV2nm(ax0.axis / 1000)[::-1].astype("float")
+        factor = 1e3
     else:
-        raise AttributeError("Signal unit invalid.")
+        raise ValueError("Axis unit invalid.")
     axis = DataAxis(axis=nmaxis, name="Wavelength", units="nm", navigate=False)
     return axis, factor
 
@@ -118,11 +121,33 @@ def data2nm(data, factor, nmaxis, ax0):
     signals are still correct.
     """
     if ax0.units == "meV":
-        return data * c.e * _n_air(nmaxis) * (ax0.axis*1e6)**2 / (factor * c.h * c.c)
+        return data * c.e * _n_air(nmaxis) * ((ax0.axis*1e6)**2)[::-1] / (factor * c.h * c.c)
     elif ax0.units == "eV":
-        return data * c.e * _n_air(nmaxis) * ax0.axis**2 / (factor * c.h * c.c)
+        return data * c.e * _n_air(nmaxis) * (ax0.axis**2)[::-1] / (factor * c.h * c.c)
     elif ax0.units == r"cm$^{-1}$":
-        return data * ax0.axis**2 / factor
+        return data * (ax0.axis**2)[::-1] / factor
+    else:
+        raise ValueError("Axis unit invalid.")
+    
+def var2nm(variance, factor, nmaxis, ax0):
+    """The variance is converted doing a inverted squared Jacobian renormalization to
+    match with the transformation of the data.
+    """
+    if ax0.units == "eV":
+        return (
+            variance
+            * ((c.e * _n_air(np.flip(nmaxis, axis=-1))[::-1] * np.flip(ax0.axis, axis=-1)**2) / (factor * c.h * c.c)) ** 2
+        )
+    if ax0.units == "meV":
+        return (
+            variance
+            * ((c.e * _n_air(np.flip(nmaxis, axis=-1))[::-1] * (np.flip(ax0.axis, axis=-1)/1000)**2) / (factor * c.h * c.c)) ** 2
+        )
+    elif ax0.units == r"cm$^{-1}$":
+        return variance * ((np.flip(ax0.axis, axis=-1)**2 / factor)) ** 2
+    else:
+        raise ValueError("Axis unit invalid.")
+
 
 
 def axis2eV(ax0):
@@ -130,7 +155,7 @@ def axis2eV(ax0):
     dependent refractive index of air. Automatically checks axis units. 
     """
     if ax0.units == "eV":
-        raise AttributeError("Signal unit is already eV.")
+        raise ValueError("Axis unit is already eV.")
     elif ax0.units == r"cm$^{-1}$":
         evaxis = invcm2eV(ax0.axis).astype("float")
         factor = 1
@@ -142,14 +167,14 @@ def axis2eV(ax0):
         evaxis = nm2eV(ax0.axis)[::-1].astype("float")
         factor = 1e6
     else:
-        raise AttributeError("Signal unit invalid.")
+        raise ValueError("Axis unit invalid.")
     axis = DataAxis(axis=evaxis, name="Energy", units="eV", navigate=False)
     return axis, factor
 
 
 def data2eV(data, factor, evaxis, ax0):
-    """The intensity is converted from counts/nm (counts/µm) to counts/meV by
-    doing a Jacobian transformation, see e.g. Mooney and Kambhampati, J. Phys.
+    r"""The intensity is converted from counts/nm (counts/µm) or counts/cm$^{-1}$ 
+    to counts/meV by doing a Jacobian transformation, see e.g. Mooney and Kambhampati, J. Phys.
     Chem. Lett. 4, 3316 (2013). Ensures that integrated signals are still
     correct.
     """
@@ -161,25 +186,39 @@ def data2eV(data, factor, evaxis, ax0):
             * c.c
             / (c.e * _n_air(1000 * ax0.axis)[::-1] * evaxis**2)
         )
-    else:
+    elif ax0.units == "nm":
         return data * factor * c.h * c.c / (c.e * _n_air(ax0.axis[::-1]) * evaxis**2)
+
+    elif ax0.units ==  r"cm$^{-1}$":
+        nmaxis, nmfactor = axis2nm(ax0)
+        nmdata = data2nm(data, nmfactor, nmaxis.axis, ax0)
+        _, evfactor = axis2eV(nmaxis)
+        return data2eV(np.flip(nmdata, axis=-1), evfactor, evaxis, nmaxis)
+
+    else:
+        raise ValueError("Axis unit invalid.")
 
 
 def var2eV(variance, factor, evaxis, ax0):
     """The variance is converted doing a squared Jacobian renormalization to
     match with the transformation of the data.
     """
-    if ax0.units == "µm":
-        return (
-            variance
-            * (factor * c.h * c.c / (c.e * _n_air(1000 * ax0.axis)[::-1] * evaxis**2))
-            ** 2
-        )
-    else:
+    if ax0.units == "nm":
         return (
             variance
             * (factor * c.h * c.c / (c.e * _n_air(ax0.axis[::-1]) * evaxis**2)) ** 2
         )
+    elif ax0.units == "µm":
+        return (
+            variance * 1e3
+            * (factor * c.h * c.c / (c.e * _n_air(1000 * ax0.axis)[::-1] * evaxis**2))
+            ** 2
+        )
+    
+    elif ax0.units == r"cm$^{-1}$":
+        return np.flip(variance, axis=-1) * 8.06554**2
+    else:
+        raise ValueError("Axis unit invalid.")
 
 
 def nm2invcm(x):
@@ -196,10 +235,13 @@ def axis2invcm(ax0):
     r"""Convert given signal axis to wavenumber scale (cm$^{-1}$). Automatically checks axis units.
     """
     if ax0.units == r"cm$^{-1}$":
-        raise AttributeError(r"Signal unit is already cm$^{-1}$.")
+        raise ValueError(r"Axis unit is already cm$^{-1}$.")
     elif ax0.units == "eV":
         invcmaxis = eV2invcm(ax0.axis).astype("float")
         factor = 1
+    elif ax0.units == "meV":
+        invcmaxis = eV2invcm(ax0.axis / 1000).astype("float")
+        factor = 1e-3
     # transform axis, invert direction
     elif ax0.units == "µm":
         invcmaxis = nm2invcm(1000 * ax0.axis)[::-1].astype("float")
@@ -208,27 +250,49 @@ def axis2invcm(ax0):
         invcmaxis = nm2invcm(ax0.axis)[::-1].astype("float")
         factor = 1e7
     else:
-        raise AttributeError("Signal unit invalid.")
+        raise ValueError("Axis unit invalid.")
     axis = DataAxis(
         axis=invcmaxis, name="Wavenumber", units=r"cm$^{-1}$", navigate=False
     )
     return axis, factor
 
 
-def data2invcm(data, factor, invcmaxis, ax0=None):
-    r"""The intensity is converted from counts/nm (counts/µm) to
+def data2invcm(data, factor, invcmaxis, ax0):
+    r"""The intensity is converted from counts/nm (counts/µm) or counts/eV (counts/meV) to
     counts/cm$^{-1}$ by doing a Jacobian transformation, see e.g. Mooney and
     Kambhampati, J. Phys. Chem. Lett. 4, 3316 (2013). Ensures that integrated
     signals are still correct.
     """
-    return data * factor / (invcmaxis**2)
+    if ax0.units == "nm" or ax0.units == "µm":
+        return data * factor / (invcmaxis**2)
+
+    elif ax0.units ==  "eV" or ax0.units == "meV":
+        nmaxis, nmfactor = axis2nm(ax0)
+        nmdata = data2nm(data, nmfactor, nmaxis.axis, ax0)
+        _, invcmfactor = axis2invcm(nmaxis)
+        return data2invcm(np.flip(nmdata, axis=-1), invcmfactor, invcmaxis, nmaxis)
+
+    else:
+        raise ValueError("Axis unit invalid.")
 
 
 def var2invcm(variance, factor, invcmaxis, ax0=None):
     r"""The variance is converted doing a squared Jacobian renormalization to
     match with the transformation of the data.
     """
-    return variance * (factor / (invcmaxis**2)) ** 2
+    if ax0.units == "nm":
+        return variance * (factor / (invcmaxis**2)) ** 2
+
+    elif ax0.units == "µm":
+        return variance * 1e3 * (factor / (invcmaxis**2)) ** 2
+
+    elif ax0.units == "eV":
+        return np.flip(variance, axis=-1) / 8.06554**2
+
+    elif ax0.units == "meV":
+        return np.flip(variance/1000, axis=-1) / 8.06554**2
+    else:
+        raise ValueError("Axis unit invalid.")
 
 
 #
